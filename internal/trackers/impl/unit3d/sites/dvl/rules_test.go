@@ -46,7 +46,6 @@ func TestHorrorGenrePasses(t *testing.T) {
 
 func TestCompoundHorrorKeywordPasses(t *testing.T) {
 	t.Parallel()
-	// Misery-class titles carry no standalone "horror" term at all.
 	failures, err := checkContent(context.Background(), subject("Drama, Thriller", "psychological horror"), nil)
 	if err != nil {
 		t.Fatalf("validate: %v", err)
