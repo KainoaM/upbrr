@@ -1,0 +1,48 @@
+// Copyright (c) 2025-2026, Audionut and the autobrr contributors.
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+package dvl
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/autobrr/upbrr/internal/trackers"
+	"github.com/autobrr/upbrr/internal/trackers/impl/unit3d"
+	"github.com/autobrr/upbrr/pkg/api"
+)
+
+// ValidationPolicy returns DreadVault's horror-only and adult-content checks.
+func ValidationPolicy() trackers.ValidationPolicyBinding {
+	return trackers.ValidationPolicyBinding{ID: "unit3d-dvl-policy-v1", Check: checkContent}
+}
+
+func checkContent(ctx context.Context, meta api.TrackerValidationSubject, _ api.Logger) ([]api.RuleFailure, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("context canceled: %w", err)
+	}
+	failures := make([]api.RuleFailure, 0, 2)
+	ruleSubject := unit3d.ValidationRuleSubject(meta)
+	keywords := unit3d.RuleKeywords(ruleSubject)
+	terms := append(trackers.RuleGenres(ruleSubject), keywords...)
+	// substring per term: the horror signal is often a compound keyword such as
+	// "psychological horror", which exact-term matching misses
+	if !containsTermSubstring(terms, "horror") {
+		failures = append(failures, trackers.NewRuleFailure("genre", "Only horror content is allowed at DVL.", api.RuleDispositionWaivable))
+	}
+	adultKeywords := []string{"xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"}
+	if trackers.AdultContent(ruleSubject) || unit3d.ContainsRuleValue(keywords, adultKeywords) {
+		failures = append(failures, trackers.NewRuleFailure("block_adult", "Porn/XXX is not allowed at DVL.", api.RuleDispositionStrict))
+	}
+	return failures, nil
+}
+
+func containsTermSubstring(values []string, target string) bool {
+	for _, value := range values {
+		if strings.Contains(strings.ToLower(value), target) {
+			return true
+		}
+	}
+	return false
+}
