@@ -88,14 +88,42 @@ func TestRRatedAnimatedHorrorPasses(t *testing.T) {
 	}
 }
 
-func TestAdultContentIsBlocked(t *testing.T) {
+func TestAdultContentIsWaivable(t *testing.T) {
 	t.Parallel()
 	failures, err := checkContent(context.Background(), subject("Horror", "porn"), nil)
 	if err != nil {
 		t.Fatalf("validate: %v", err)
 	}
+	for _, failure := range failures {
+		if failure.Rule == "block_adult" {
+			if failure.Disposition != api.RuleDispositionWaivable {
+				t.Fatalf("adult screen is not waivable: %#v", failure)
+			}
+			return
+		}
+	}
+	t.Fatalf("adult keyword was not flagged: %#v", failures)
+}
+
+func TestIncidentalMatureKeywordsPass(t *testing.T) {
+	t.Parallel()
+	failures, err := checkContent(context.Background(), subject("Horror, Thriller", "orgy, erotic"), nil)
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if hasRule(failures, "block_adult") {
+		t.Fatalf("incidental keywords were flagged as porn: %#v", failures)
+	}
+}
+
+func TestAdultGenreFromProviderIsFlagged(t *testing.T) {
+	t.Parallel()
+	failures, err := checkContent(context.Background(), subject("Horror, Adult", ""), nil)
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
 	if !hasRule(failures, "block_adult") {
-		t.Fatalf("adult keyword was not blocked: %#v", failures)
+		t.Fatalf("adult provider genre was not flagged: %#v", failures)
 	}
 }
 
