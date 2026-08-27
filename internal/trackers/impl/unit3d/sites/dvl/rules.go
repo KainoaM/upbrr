@@ -24,16 +24,12 @@ func checkContent(ctx context.Context, meta api.TrackerValidationSubject, _ api.
 	}
 	failures := make([]api.RuleFailure, 0, 2)
 	ruleSubject := unit3d.ValidationRuleSubject(meta)
-	keywords := unit3d.RuleKeywords(ruleSubject)
-	terms := append(trackers.RuleGenres(ruleSubject), keywords...)
-	// substring per term: the horror signal is often a compound keyword such as
-	// "psychological horror", which exact-term matching misses
+	terms := append(trackers.RuleGenres(ruleSubject), unit3d.RuleKeywords(ruleSubject)...)
+	// substring per term: the horror signal is often a compound keyword
 	if !containsTermSubstring(terms, "horror") {
 		failures = append(failures, trackers.NewRuleFailure("genre", "Only horror content is allowed at DVL.", api.RuleDispositionWaivable))
 	}
-	// one list over genres and keywords, waivable — matching the Upload-Assistant
-	// DreadVault module. "adult animation", "orgy" and "erotic" are excluded: TMDB
-	// keywords on legitimate horror, and TMDB already excludes adult content.
+	// terms that never appear as TMDB keywords on legitimate horror; matches the Upload-Assistant module
 	adultKeywords := []string{"xxx", "porn", "adult", "hentai", "softcore"}
 	if unit3d.ContainsRuleValue(terms, adultKeywords) {
 		failures = append(failures, trackers.NewRuleFailure("block_adult", "Porn/XXX is not allowed at DVL.", api.RuleDispositionWaivable))

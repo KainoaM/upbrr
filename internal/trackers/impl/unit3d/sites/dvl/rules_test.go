@@ -77,17 +77,6 @@ func TestNonHorrorIsRefused(t *testing.T) {
 	}
 }
 
-func TestRRatedAnimatedHorrorPasses(t *testing.T) {
-	t.Parallel()
-	failures, err := checkContent(context.Background(), subject("Animation, Comedy, Horror", "adult animation, nudity"), nil)
-	if err != nil {
-		t.Fatalf("validate: %v", err)
-	}
-	if hasRule(failures, "block_adult") {
-		t.Fatalf("demographic keyword was blocked as porn: %#v", failures)
-	}
-}
-
 func TestAdultContentIsWaivable(t *testing.T) {
 	t.Parallel()
 	failures, err := checkContent(context.Background(), subject("Horror", "porn"), nil)
@@ -107,7 +96,7 @@ func TestAdultContentIsWaivable(t *testing.T) {
 
 func TestIncidentalMatureKeywordsPass(t *testing.T) {
 	t.Parallel()
-	failures, err := checkContent(context.Background(), subject("Horror, Thriller", "orgy, erotic"), nil)
+	failures, err := checkContent(context.Background(), subject("Horror, Thriller", "adult animation, orgy, erotic"), nil)
 	if err != nil {
 		t.Fatalf("validate: %v", err)
 	}
