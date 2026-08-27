@@ -31,7 +31,8 @@ func checkContent(ctx context.Context, meta api.TrackerValidationSubject, _ api.
 	if !containsTermSubstring(terms, "horror") {
 		failures = append(failures, trackers.NewRuleFailure("genre", "Only horror content is allowed at DVL.", api.RuleDispositionWaivable))
 	}
-	adultKeywords := []string{"xxx", "erotic", "porn", "adult", "orgy", "hentai", "adult animation", "softcore"}
+	// "adult animation" is excluded: a TMDB demographic keyword for R-rated animation, not a porn marker
+	adultKeywords := []string{"xxx", "erotic", "porn", "adult", "orgy", "hentai", "softcore"}
 	if trackers.AdultContent(ruleSubject) || unit3d.ContainsRuleValue(keywords, adultKeywords) {
 		failures = append(failures, trackers.NewRuleFailure("block_adult", "Porn/XXX is not allowed at DVL.", api.RuleDispositionStrict))
 	}

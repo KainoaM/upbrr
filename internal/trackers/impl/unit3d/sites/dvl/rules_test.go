@@ -77,6 +77,17 @@ func TestNonHorrorIsRefused(t *testing.T) {
 	}
 }
 
+func TestRRatedAnimatedHorrorPasses(t *testing.T) {
+	t.Parallel()
+	failures, err := checkContent(context.Background(), subject("Animation, Comedy, Horror", "adult animation, nudity"), nil)
+	if err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if hasRule(failures, "block_adult") {
+		t.Fatalf("demographic keyword was blocked as porn: %#v", failures)
+	}
+}
+
 func TestAdultContentIsBlocked(t *testing.T) {
 	t.Parallel()
 	failures, err := checkContent(context.Background(), subject("Horror", "porn"), nil)
