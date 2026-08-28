@@ -16,6 +16,7 @@ func Profile() unit3d.Profile {
 		BaseURL:          "https://dreadvault.org",
 		ValidationPolicy: ValidationPolicy(),
 		BannedGroups:     BannedGroups(),
+		DupePolicy:       duplicatePolicy(),
 		MetadataPolicy: &trackers.TrackerMetadataPolicy{
 			RequireKnownCategory: true,
 			Requirements: []trackers.MetadataRequirement{{

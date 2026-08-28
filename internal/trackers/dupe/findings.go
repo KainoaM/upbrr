@@ -78,7 +78,21 @@ func collectCandidateFindings(
 	workScope WorkScope,
 ) []RuleFinding {
 	findings := make([]RuleFinding, 0, 12)
-	findings = append(findings, collectExactFindings(target, candidate)...)
+	findings = append(findings, collectExactFindings(target, candidate, policy)...)
+	if policy.LiteralIdentityOnly {
+		if len(findings) > 0 {
+			return findings
+		}
+		return []RuleFinding{{
+			RuleID:     strings.TrimSpace(policy.ID) + "/literal_identity",
+			EvidenceID: policy.EvidenceID,
+			Source:     "tracker",
+			Status:     RuleFindingMatched,
+			Relation:   api.DupeRelationCoexists,
+			ReasonCode: "literal_identity_differs",
+			Priority:   findingPriorityExact,
+		}}
+	}
 	findings = append(findings, collectGeneralFindings(targetFacts, candidateFacts, policy, workScope)...)
 	findings = append(findings, collectTrackerRules(target, targetFacts, candidate, candidateFacts, policy)...)
 	if finding, ok := collectTrackerSlotFinding(target, targetFacts, candidate, candidateFacts, policy); ok {
@@ -106,13 +120,28 @@ func collectCandidateFindings(
 	return findings
 }
 
-func collectExactFindings(target api.TrackerDuplicateTarget, candidate TrackerCandidate) []RuleFinding {
-	if !exactCandidate(target, candidate) {
+func collectExactFindings(
+	target api.TrackerDuplicateTarget,
+	candidate TrackerCandidate,
+	policy trackerspkg.DupePolicy,
+) []RuleFinding {
+	exact := exactCandidate(target, candidate)
+	ruleID := GeneralPolicyID + "/exact_identity"
+	source := "general"
+	evidenceID := ""
+	if policy.LiteralIdentityOnly {
+		exact = literalIdentityCandidate(target, candidate)
+		ruleID = strings.TrimSpace(policy.ID) + "/literal_identity"
+		source = "tracker"
+		evidenceID = policy.EvidenceID
+	}
+	if !exact {
 		return nil
 	}
 	return []RuleFinding{{
-		RuleID:     GeneralPolicyID + "/exact_identity",
-		Source:     "general",
+		RuleID:     ruleID,
+		EvidenceID: evidenceID,
+		Source:     source,
 		Status:     RuleFindingMatched,
 		Relation:   api.DupeRelationExactDuplicate,
 		ReasonCode: "exact_identity",

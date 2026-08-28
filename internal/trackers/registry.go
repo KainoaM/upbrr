@@ -651,8 +651,15 @@ func validateDupePolicy(policy DupePolicy) error {
 	if strings.TrimSpace(policy.ID) == "" {
 		return errors.New("policy ID is empty")
 	}
+	if policy.LiteralIdentityOnly && strings.TrimSpace(policy.EvidenceID) == "" {
+		return errors.New("literal identity policy has no evidence ID")
+	}
+	if policy.LiteralIdentityOnly && literalIdentityPolicyHasComparisonOverlays(policy) {
+		return errors.New("literal identity policy cannot include comparison overlays")
+	}
 	isCompatibility := strings.Contains(strings.ToLower(policy.ID), "/duplicate-compat/")
-	if !isCompatibility && (len(policy.SlotDimensions) > 0 || len(policy.OptionalSlotDimensions) > 0 || len(policy.CompleteSlotDimensions) > 0 ||
+	if !isCompatibility && (policy.LiteralIdentityOnly || len(policy.SlotDimensions) > 0 || len(policy.OptionalSlotDimensions) > 0 ||
+		len(policy.CompleteSlotDimensions) > 0 ||
 		len(policy.RequiredDimensions) > 0 || len(policy.SuppressGeneralCoexistence) > 0 || len(policy.CoexistenceRules) > 0 ||
 		len(policy.PrecedenceRules) > 0 || len(policy.SetRules) > 0 || policy.SizeVariancePercent > 0) {
 		if strings.TrimSpace(policy.EvidenceID) == "" {
@@ -708,6 +715,19 @@ func validateDupePolicy(policy DupePolicy) error {
 		}
 	}
 	return nil
+}
+
+func literalIdentityPolicyHasComparisonOverlays(policy DupePolicy) bool {
+	return len(policy.SlotDimensions) > 0 || len(policy.OptionalSlotDimensions) > 0 ||
+		len(policy.CompleteSlotDimensions) > 0 || len(policy.RequiredDimensions) > 0 ||
+		len(policy.SuppressGeneralCoexistence) > 0 || policy.HDRSlotMode != "" ||
+		policy.HDRPartialMode != "" || policy.HDRCompatibilityMode != "" ||
+		policy.RequireDolbyVisionProfile || policy.DolbyVisionProfile5Slot ||
+		policy.SlotContradictionsRequireManualReview || len(policy.CoexistenceRules) > 0 ||
+		len(policy.PrecedenceRules) > 0 || len(policy.ManualReviewRules) > 0 ||
+		len(policy.SetRules) > 0 || policy.SizeVariancePercent != 0 ||
+		len(policy.SizeVarianceResolutions) > 0 || len(policy.SizeVarianceTypes) > 0 ||
+		policy.TrumpableOverridesSlot
 }
 
 func firstPolicyEvidenceID(ruleEvidenceID string, policyEvidenceID string) string {

@@ -5,6 +5,7 @@ package trackers
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -173,6 +174,151 @@ func TestValidateDupePolicyRequiresEvidenceIDForAutomaticRules(t *testing.T) {
 	policy.EvidenceID = "example-rules"
 	if err := validateDupePolicy(policy); err != nil {
 		t.Fatalf("evidence-backed policy rejected: %v", err)
+	}
+}
+
+func TestValidateDupePolicyLiteralIdentityOnlyRequiresEvidence(t *testing.T) {
+	t.Parallel()
+
+	for _, id := range []string{
+		"example/duplicate/v1",
+		"example/duplicate-compat/v1",
+	} {
+		t.Run(id, func(t *testing.T) {
+			policy := DupePolicy{
+				ID:                  id,
+				LiteralIdentityOnly: true,
+				SearchScope:         DupeSearchScope{MaxPages: 100},
+			}
+			if err := validateDupePolicy(policy); err == nil || !strings.Contains(err.Error(), "evidence ID") {
+				t.Fatalf("missing literal-identity traceability error = %v", err)
+			}
+
+			policy.EvidenceID = "example-literal-identity-policy"
+			if err := validateDupePolicy(policy); err != nil {
+				t.Fatalf("evidence-backed literal policy rejected: %v", err)
+			}
+		})
+	}
+}
+
+func TestDupePolicyOmitsDisabledLiteralIdentityModeFromSerializedPolicy(t *testing.T) {
+	t.Parallel()
+
+	disabled, err := json.Marshal(DupePolicy{ID: "example/duplicate/v1"})
+	if err != nil {
+		t.Fatalf("marshal disabled literal policy: %v", err)
+	}
+	if strings.Contains(string(disabled), "LiteralIdentityOnly") {
+		t.Fatalf("disabled literal mode changed serialized policy: %s", disabled)
+	}
+
+	enabled, err := json.Marshal(DupePolicy{ID: "example/duplicate/v1", LiteralIdentityOnly: true})
+	if err != nil {
+		t.Fatalf("marshal enabled literal policy: %v", err)
+	}
+	if !strings.Contains(string(enabled), `"LiteralIdentityOnly":true`) {
+		t.Fatalf("enabled literal mode missing from serialized policy: %s", enabled)
+	}
+}
+
+func TestValidateDupePolicyLiteralIdentityOnlyRejectsComparisonOverlays(t *testing.T) {
+	t.Parallel()
+
+	base := func() DupePolicy {
+		return DupePolicy{
+			ID:                  "example/duplicate/v1",
+			EvidenceID:          "example-literal-identity-policy",
+			LiteralIdentityOnly: true,
+			SearchScope:         DupeSearchScope{MaxPages: 100},
+		}
+	}
+	if err := validateDupePolicy(base()); err != nil {
+		t.Fatalf("plain literal policy rejected: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		configure func(*DupePolicy)
+	}{
+		{"slot dimension", func(policy *DupePolicy) {
+			policy.SlotDimensions = []DupeDimension{DupeDimensionResolution}
+		}},
+		{"optional slot dimension", func(policy *DupePolicy) {
+			policy.OptionalSlotDimensions = []DupeDimension{DupeDimensionProvider}
+		}},
+		{"complete slot dimension", func(policy *DupePolicy) {
+			policy.CompleteSlotDimensions = []DupeDimension{DupeDimensionHDR}
+		}},
+		{"required dimension", func(policy *DupePolicy) {
+			policy.RequiredDimensions = []DupeDimension{DupeDimensionCodec}
+		}},
+		{"general coexistence suppression", func(policy *DupePolicy) {
+			policy.SuppressGeneralCoexistence = []DupeDimension{DupeDimensionResolution}
+		}},
+		{"HDR slot mode", func(policy *DupePolicy) {
+			policy.HDRSlotMode = DupeHDRSlotModeGeneric
+		}},
+		{"HDR partial mode", func(policy *DupePolicy) {
+			policy.HDRPartialMode = DupeHDRPartialGenericMarker
+		}},
+		{"HDR compatibility", func(policy *DupePolicy) {
+			policy.HDRCompatibilityMode = DupeHDRCompatibilityDirectional
+		}},
+		{"DV profile requirement", func(policy *DupePolicy) {
+			policy.RequireDolbyVisionProfile = true
+		}},
+		{"DV profile slot", func(policy *DupePolicy) {
+			policy.DolbyVisionProfile5Slot = true
+		}},
+		{"slot contradiction review", func(policy *DupePolicy) {
+			policy.SlotContradictionsRequireManualReview = true
+		}},
+		{"coexistence rule", func(policy *DupePolicy) {
+			policy.CoexistenceRules = []DupeRule{{ID: "example-coexists", Relation: string(api.DupeRelationCoexists)}}
+		}},
+		{"precedence rule", func(policy *DupePolicy) {
+			policy.PrecedenceRules = []DupeRule{{ID: "example-precedence", Relation: string(api.DupeRelationExistingPreferred)}}
+		}},
+		{"manual review rule", func(policy *DupePolicy) {
+			policy.ManualReviewRules = []DupeRule{{ID: "example-review", RequiresManualStep: true}}
+		}},
+		{"set rule", func(policy *DupePolicy) {
+			policy.SetRules = []DupeSetRule{{
+				ID: "example-set",
+				TargetPredicates: []DupeSetPredicate{{
+					Dimension: DupeDimensionResolution,
+					Values:    []string{"1080p"},
+				}},
+				CandidatePredicates: []DupeSetPredicate{{
+					Dimension: DupeDimensionResolution,
+					Values:    []string{"1080p"},
+				}},
+				Capacity: 1,
+			}}
+		}},
+		{"size variance", func(policy *DupePolicy) {
+			policy.SizeVariancePercent = 20
+		}},
+		{"size resolution scope", func(policy *DupePolicy) {
+			policy.SizeVarianceResolutions = []string{"1080p"}
+		}},
+		{"size type scope", func(policy *DupePolicy) {
+			policy.SizeVarianceTypes = []string{"ENCODE"}
+		}},
+		{"trump override", func(policy *DupePolicy) {
+			policy.TrumpableOverridesSlot = true
+		}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			policy := base()
+			test.configure(&policy)
+			if err := validateDupePolicy(policy); err == nil || !strings.Contains(err.Error(), "literal identity") {
+				t.Fatalf("mixed literal policy error = %v", err)
+			}
+		})
 	}
 }
 

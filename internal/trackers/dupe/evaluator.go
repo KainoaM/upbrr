@@ -143,6 +143,51 @@ func exactCandidate(target api.TrackerDuplicateTarget, candidate TrackerCandidat
 		releaseNameMatchesFile(target.FileNames[0], candidate.Name)
 }
 
+func literalIdentityCandidate(target api.TrackerDuplicateTarget, candidate TrackerCandidate) bool {
+	targetFiles := normalizedFileSet(target.FileNames)
+	candidateFiles := normalizedFileSet(candidate.Files)
+	if literalIdentityDiscType(target.Type) {
+		targetFiles = nil
+		candidateFiles = nil
+	}
+	sameSize := target.SizeBytes > 0 && candidate.SizeKnown && candidate.SizeBytes > 0 && target.SizeBytes == candidate.SizeBytes
+	if len(targetFiles) > 0 && len(candidateFiles) > 0 {
+		return slices.Equal(targetFiles, candidateFiles) && sameSize
+	}
+
+	candidateFileCount := candidate.FileCount
+	if candidateFileCount <= 0 {
+		candidateFileCount = len(candidateFiles)
+	}
+	if len(targetFiles) > 0 && candidateFileCount > 0 && len(targetFiles) == candidateFileCount && sameSize {
+		return true
+	}
+	if len(targetFiles) == 0 && len(candidateFiles) == 0 && sameSize {
+		return true
+	}
+	if !literalIdentityNameMatch(target.Names, candidate.Name) {
+		return false
+	}
+	return sameSize || target.SizeBytes <= 0 || !candidate.SizeKnown || candidate.SizeBytes <= 0
+}
+
+func literalIdentityDiscType(value string) bool {
+	switch strings.ToUpper(strings.TrimSpace(value)) {
+	case "DISC", "BDMV", "DVD":
+		return true
+	default:
+		return false
+	}
+}
+
+func literalIdentityNameMatch(names []string, candidate string) bool {
+	candidate = strings.TrimSpace(candidate)
+	return candidate != "" && slices.ContainsFunc(names, func(name string) bool {
+		name = strings.TrimSpace(name)
+		return name != "" && strings.EqualFold(name, candidate)
+	})
+}
+
 // videoFileSet returns the sorted normalized basenames of primary video
 // content, excluding auxiliary companions whose names repeat across releases.
 func videoFileSet(files []string) []string {
@@ -338,6 +383,8 @@ func dupeReasonMessage(reason string, relation api.DupeRelation) string {
 	switch strings.TrimSpace(reason) {
 	case "exact_identity":
 		return "Candidate has identical release or file identity."
+	case "literal_identity_differs":
+		return "Candidate has different literal release identity."
 	case "existing_full_disc":
 		return "Tracker permits only one full disc for this work."
 	case "existing_season_pack":

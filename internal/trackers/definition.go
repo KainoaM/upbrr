@@ -458,6 +458,9 @@ type DupePolicy struct {
 	// EvidenceID identifies the policy evidence backing automatic
 	// tracker-specific behavior.
 	EvidenceID string
+	// LiteralIdentityOnly permits every candidate except an exact release
+	// identity and bypasses slot, precedence, and trump inference.
+	LiteralIdentityOnly bool `json:",omitempty"`
 	// TargetReleaseOrigin derives tracker-native origin from the proposed release.
 	// ID versions this pure resolver; it is excluded from serialized fingerprints.
 	TargetReleaseOrigin func(api.UploadSubject) string `json:"-"`

@@ -39,6 +39,31 @@ func (bannedGroupDefinition) Prepare(
 	return trackerspkg.TrackerPlan{}, nil
 }
 
+type literalIdentityDefinition struct{}
+
+func (literalIdentityDefinition) Name() string { return "DVL" }
+
+func (literalIdentityDefinition) DefaultBaseURL() string { return "https://dreadvault.org" }
+
+func (literalIdentityDefinition) UploadContentMode() trackerspkg.UploadContentMode {
+	return trackerspkg.UploadContentModeNone
+}
+
+func (literalIdentityDefinition) Prepare(
+	context.Context,
+	trackerspkg.PreparationInput,
+) (trackerspkg.TrackerPlan, *trackerspkg.PreparationFailure) {
+	return trackerspkg.TrackerPlan{}, nil
+}
+
+func (literalIdentityDefinition) DupePolicy() *trackerspkg.DupePolicy {
+	return &trackerspkg.DupePolicy{
+		ID:                  "dvl/duplicate/v1",
+		EvidenceID:          "dvl-owner-guidance-exact-duplicates-only",
+		LiteralIdentityOnly: true,
+	}
+}
+
 func testService(adapters map[string]Adapter) *Service {
 	return &Service{
 		cfg:                    adaptersConfig(adapters),
@@ -143,6 +168,81 @@ func TestProjectAdapterResultDebugLogsEveryCandidateEvaluation(t *testing.T) {
 	}
 	if len(logger.trace) != 0 {
 		t.Fatalf("candidate evaluations unexpectedly logged at trace: %#v", logger.trace)
+	}
+}
+
+func TestCheckWithAssessmentUsesLiteralIdentityPolicyAndSourceEvidence(t *testing.T) {
+	t.Parallel()
+
+	registry := trackerspkg.NewRegistry()
+	if err := registry.Register(literalIdentityDefinition{}); err != nil {
+		t.Fatalf("register literal identity definition: %v", err)
+	}
+	var received api.DuplicateSubject
+	service := testService(map[string]Adapter{
+		"DVL": AdapterFunc(func(_ context.Context, subject api.DuplicateSubject) AdapterResult {
+			received = subject
+			return ResolvedWithSearch([]api.DupeEntry{
+				{
+					ID:        "101",
+					Name:      "Example.Release.Renamed.2026.1080p.WEB-DL-OTHER",
+					SizeBytes: 1_000,
+					SizeKnown: true,
+					Files:     []string{"tracker/EXAMPLE.RELEASE.2026.MKV"},
+					FileCount: 1,
+					Link:      "https://dreadvault.org/torrents/101",
+				},
+				{
+					ID:        "102",
+					Name:      "Example.Release.2026.1080p.WEB-DL-OTHER",
+					SizeBytes: 900,
+					SizeKnown: true,
+					Files:     []string{"Example.Release.2026.1080p.WEB-DL-OTHER.mkv"},
+					FileCount: 1,
+					Link:      "https://dreadvault.org/torrents/102",
+				},
+			}, nil, SearchEvidence{
+				Complete:  true,
+				WorkScope: WorkScopeProviderID,
+				Pages:     1,
+				Scope:     "work_category",
+			})
+		}),
+	})
+	service.registry = registry
+	meta := api.DuplicateSubject{
+		SourcePath:  "/synthetic/Example.Release.2026.mkv",
+		ReleaseName: "Example.Release.2026.1080p.WEB-DL-GRP",
+		SourceSize:  1_000,
+		FileList:    []string{"local/Example.Release.2026.mkv"},
+	}
+
+	summary, assessment, err := service.CheckWithAssessment(
+		context.Background(),
+		meta,
+		[]string{"DVL"},
+		CheckOptions{},
+	)
+	if err != nil {
+		t.Fatalf("check literal identity policy: %v", err)
+	}
+	if received.SourceSize != meta.SourceSize || len(received.FileList) != 1 || received.FileList[0] != meta.FileList[0] {
+		t.Fatalf("adapter subject lost source identity: %#v", received)
+	}
+	if len(summary.Results) != 1 {
+		t.Fatalf("duplicate results = %#v", summary.Results)
+	}
+	result := summary.Results[0]
+	if !result.HasDupes || result.PolicyID != "dvl/duplicate/v1" || !result.Search.Complete ||
+		len(result.Evaluations) != 2 || result.Evaluations[0].ID != "101" ||
+		result.Evaluations[0].Relation != api.DupeRelationExactDuplicate || result.Evaluations[1].ID != "102" ||
+		result.Evaluations[1].Relation != api.DupeRelationCoexists {
+		t.Fatalf("literal identity service result = %#v", result)
+	}
+	decision, ok := assessment.Decision("DVL")
+	if !ok || decision.Verdict != VerdictBlocked || decision.Match.MatchedID != "101" ||
+		decision.Match.MatchedReason != "exact_identity" {
+		t.Fatalf("literal identity assessment = %#v found=%t", decision, ok)
 	}
 }
 
