@@ -14,6 +14,7 @@ func Profile() unit3d.Profile {
 	return unit3d.Profile{
 		Name:             "DVL",
 		BaseURL:          "https://dreadvault.org",
+		DupePolicy:       duplicatePolicy(),
 		ValidationPolicy: ValidationPolicy(),
 		BannedGroups:     BannedGroups(),
 		MetadataPolicy: &trackers.TrackerMetadataPolicy{

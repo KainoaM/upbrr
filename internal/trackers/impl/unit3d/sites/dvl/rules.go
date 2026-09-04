@@ -13,7 +13,8 @@ import (
 	"github.com/autobrr/upbrr/pkg/api"
 )
 
-// ValidationPolicy returns DreadVault's horror-only and adult-content checks.
+// ValidationPolicy returns DreadVault's waivable horror and adult-content checks.
+// Both checks inspect provider genres and TMDB keywords.
 func ValidationPolicy() trackers.ValidationPolicyBinding {
 	return trackers.ValidationPolicyBinding{ID: "unit3d-dvl-policy-v1", Check: checkContent}
 }
@@ -25,11 +26,11 @@ func checkContent(ctx context.Context, meta api.TrackerValidationSubject, _ api.
 	failures := make([]api.RuleFailure, 0, 2)
 	ruleSubject := unit3d.ValidationRuleSubject(meta)
 	terms := append(trackers.RuleGenres(ruleSubject), unit3d.RuleKeywords(ruleSubject)...)
-	// substring per term: the horror signal is often a compound keyword
+	// Horror may appear within a compound genre or keyword.
 	if !containsTermSubstring(terms, "horror") {
 		failures = append(failures, trackers.NewRuleFailure("genre", "Only horror content is allowed at DVL.", api.RuleDispositionWaivable))
 	}
-	// terms that never appear as TMDB keywords on legitimate horror; matches the Upload-Assistant module
+	// Match whole terms so compound keywords such as "adult animation" remain allowed.
 	adultKeywords := []string{"xxx", "porn", "adult", "hentai", "softcore"}
 	if unit3d.ContainsRuleValue(terms, adultKeywords) {
 		failures = append(failures, trackers.NewRuleFailure("block_adult", "Porn/XXX is not allowed at DVL.", api.RuleDispositionWaivable))
