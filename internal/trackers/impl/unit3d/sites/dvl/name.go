@@ -34,8 +34,6 @@ func buildName(meta api.UploadSubject, _ config.TrackerConfig) string {
 
 	switch {
 	case nameType == "DVDRIP":
-		name = removeLast(name, meta.Edition)
-		name = removeLast(name, meta.Repack)
 		encode := strings.TrimSpace(meta.VideoEncode)
 		if encode == "" {
 			encode = codec
@@ -44,8 +42,8 @@ func buildName(meta api.UploadSubject, _ config.TrackerConfig) string {
 		if encode != "" && audio != "" {
 			if index := strings.LastIndex(name, " "+encode+" DVDRip"); index >= 0 {
 				name = name[:index] + name[index+len(encode)+1:]
+				name = insertAfterLast(name, audio, encode)
 			}
-			name = insertAfterLast(name, audio, encode)
 		}
 		source = "DVDRip"
 		name = insertBefore(name, source, resolution)
@@ -65,15 +63,13 @@ func buildName(meta api.UploadSubject, _ config.TrackerConfig) string {
 				source = system + " " + source
 			}
 		}
-	case nameType == "ENCODE" && resolution != "":
+	case nameType == "ENCODE" && resolution != "" && (source == "PAL DVD" || source == "NTSC DVD" || source == "DVD"):
 		// A codec token makes the parser type a DVDRip as ENCODE with a DVD source.
-		for _, token := range []string{" NTSC DVD ", " PAL DVD ", " DVD "} {
-			if strings.Contains(name, resolution+token) {
-				name = strings.Replace(name, resolution+token, resolution+" DVDRip ", 1)
-				name = removeLast(name, meta.Edition)
-				name = removeLast(name, meta.Repack)
-				break
-			}
+		token := " " + resolution + " " + source + " "
+		if index := strings.LastIndex(name, token); index >= 0 {
+			prefix := strings.TrimSuffix(name[:index], " "+strings.TrimSpace(meta.Repack))
+			prefix = strings.TrimSuffix(prefix, " "+strings.TrimSpace(meta.Edition))
+			name = prefix + " " + resolution + " DVDRip " + name[index+len(token):]
 		}
 	}
 

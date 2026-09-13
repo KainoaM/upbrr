@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/autobrr/upbrr/internal/config"
+	"github.com/autobrr/upbrr/internal/metadata"
 	"github.com/autobrr/upbrr/pkg/api"
 )
 
@@ -23,53 +24,144 @@ func TestBuildName(t *testing.T) {
 		want string
 	}{
 		{
-			name: "DVDRip omits edition",
+			name: "DVD encode omits edition without changing title",
 			meta: api.UploadSubject{
-				ReleaseName: "Example Movie 1999 Directors Cut PAL DVD x264 DVDRip DD 2.0-GRP",
-				Release:     api.ReleaseInfo{Year: 1999, Resolution: "480p"},
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "Uncut Shadows",
+					Year:       2001,
+					Resolution: "480p",
+				},
+				Type:        "ENCODE",
+				Source:      "PAL DVD",
+				VideoEncode: " x264",
+				Audio:       "DD 2.0",
+				Edition:     "Uncut",
+				Repack:      "REPACK",
+				Tag:         "-GRP",
+			},
+			want: "Uncut Shadows 2001 480p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "DVDRip preserves edition title with DVD encode parity",
+			meta: api.UploadSubject{
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "Uncut Shadows",
+					Year:       2001,
+					Resolution: "480p",
+				},
 				Type:        "DVDRIP",
 				Source:      "PAL DVD",
 				VideoEncode: " x264",
 				Audio:       "DD 2.0",
-				Edition:     "Directors Cut",
+				Edition:     "Uncut",
+				Repack:      "REPACK",
+				Tag:         "-GRP",
 			},
-			want: "Example Movie 1999 480p DVDRip DD 2.0 x264-GRP",
+			want: "Uncut Shadows 2001 480p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "DVDRip preserves repack title and edition alternate title",
+			meta: api.UploadSubject{
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "REPACK Shadows",
+					Year:       2001,
+					Resolution: "480p",
+				},
+				AlternateTitle: "AKA Uncut Nights",
+				Type:           "DVDRIP",
+				Source:         "PAL DVD",
+				VideoEncode:    "x264",
+				Audio:          "DD 2.0",
+				Edition:        "Uncut",
+				Repack:         "REPACK",
+				Tag:            "-GRP",
+			},
+			want: "REPACK Shadows AKA Uncut Nights 2001 480p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "TV DVDRip keeps codec after audio",
+			meta: api.UploadSubject{
+				Release: api.ReleaseInfo{
+					Category:   "TV",
+					Title:      "Example Show",
+					Resolution: "576p",
+				},
+				SeasonStr:   "S01",
+				Type:        "DVDRIP",
+				Source:      "PAL DVD",
+				VideoEncode: "x264",
+				Audio:       "DD 2.0",
+				Tag:         "-GRP",
+			},
+			want: "Example Show S01 576p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "DVDRip override keeps codec after audio",
+			meta: api.UploadSubject{
+				ReleaseName: "Example Show S01 576p DVDRip DD 2.0 x264-GRP",
+				Release:     api.ReleaseInfo{Resolution: "576p"},
+				Type:        "DVDRIP",
+				Source:      "PAL DVD",
+				VideoEncode: "x264",
+				Audio:       "DD 2.0",
+			},
+			want: "Example Show S01 576p DVDRip DD 2.0 x264-GRP",
 		},
 		{
 			name: "DVDRip typed as a DVD encode omits repack",
 			meta: api.UploadSubject{
-				ReleaseName: "Example Movie 1994 REPACK3 480p DVD DD 5.1 x264-GRP",
-				Release:     api.ReleaseInfo{Year: 1994, Resolution: "480p"},
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "REPACK3 Shadows",
+					Year:       1994,
+					Resolution: "480p",
+				},
 				Type:        "ENCODE",
 				Source:      "DVD",
 				VideoEncode: "x264",
 				Audio:       "DD 5.1",
 				Repack:      "REPACK3",
+				Tag:         "-GRP",
 			},
-			want: "Example Movie 1994 480p DVDRip DD 5.1 x264-GRP",
+			want: "REPACK3 Shadows 1994 480p DVDRip DD 5.1 x264-GRP",
 		},
 		{
 			name: "DVDRip typed as a DVD encode",
 			meta: api.UploadSubject{
-				ReleaseName: "Example Movie 2001 480p DVD DD 2.0 x264-GRP",
-				Release:     api.ReleaseInfo{Year: 2001, Resolution: "480p"},
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "Example Movie",
+					Year:       2001,
+					Resolution: "480p",
+				},
 				Type:        "ENCODE",
-				Source:      "DVDRiP",
+				Source:      "DVD",
 				VideoEncode: "x264",
 				Audio:       "DD 2.0",
+				Tag:         "-GRP",
 			},
 			want: "Example Movie 2001 480p DVDRip DD 2.0 x264-GRP",
 		},
 		{
 			name: "German DVDRip typed as a DVD encode",
 			meta: api.UploadSubject{
-				ReleaseName:    "Example Show S04E03 Title 480p NTSC DVD DD 2.0 x264-GRP",
-				Release:        api.ReleaseInfo{Resolution: "480p"},
+				Release: api.ReleaseInfo{
+					Category:   "TV",
+					Title:      "Example Show",
+					Resolution: "480p",
+				},
+				SeasonStr:      "S04",
+				EpisodeStr:     "E03",
+				EpisodeTitle:   "Title",
 				Type:           "ENCODE",
 				Source:         "NTSC DVD",
 				VideoEncode:    "x264",
 				Audio:          "DD 2.0",
 				AudioLanguages: []string{"German"},
+				Tag:            "-GRP",
 			},
 			want: "Example Show S04E03 Title GERMAN 480p DVDRip DD 2.0 x264-GRP",
 		},
@@ -144,6 +236,40 @@ func TestBuildName(t *testing.T) {
 				Audio:       "DD 2.0",
 			},
 			want: "Example x264 DVDRip Tales 2001 480p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "DVD encode title containing resolution and source",
+			meta: api.UploadSubject{
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "480p DVD Tales",
+					Year:       2001,
+					Resolution: "480p",
+				},
+				Type:        "ENCODE",
+				Source:      "DVD",
+				VideoEncode: "x264",
+				Audio:       "DD 2.0",
+				Tag:         "-GRP",
+			},
+			want: "480p DVD Tales 2001 480p DVDRip DD 2.0 x264-GRP",
+		},
+		{
+			name: "BluRay encode title containing DVD resolution and source",
+			meta: api.UploadSubject{
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "480p DVD Tales",
+					Year:       2001,
+					Resolution: "480p",
+				},
+				Type:        "ENCODE",
+				Source:      "BluRay",
+				VideoEncode: "x264",
+				Audio:       "DD 2.0",
+				Tag:         "-GRP",
+			},
+			want: "480p DVD Tales 2001 480p BluRay DD 2.0 x264-GRP",
 		},
 		{
 			name: "DVD full disc with a DVD-suffixed source",
@@ -266,13 +392,18 @@ func TestBuildName(t *testing.T) {
 		{
 			name: "non-linguistic DVDRip audio omits marker",
 			meta: api.UploadSubject{
-				ReleaseName:    "Example Movie 1984 480p DVD DD 2.0 x264-GRP",
-				Release:        api.ReleaseInfo{Year: 1984, Resolution: "480p"},
+				Release: api.ReleaseInfo{
+					Category:   "MOVIE",
+					Title:      "Example Movie",
+					Year:       1984,
+					Resolution: "480p",
+				},
 				Type:           "ENCODE",
-				Source:         "DVDRiP",
+				Source:         "DVD",
 				VideoEncode:    "x264",
 				Audio:          "DD 2.0",
 				AudioLanguages: []string{"zxx"},
+				Tag:            "-GRP",
 			},
 			want: "Example Movie 1984 480p DVDRip DD 2.0 x264-GRP",
 		},
@@ -414,6 +545,26 @@ func TestBuildName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			if tt.meta.ReleaseName == "" {
+				tt.meta.ReleaseName = metadata.BuildReleaseName(api.ReleaseNameRequest{
+					Category:     tt.meta.Release.Category,
+					Type:         tt.meta.Type,
+					Title:        tt.meta.Release.Title,
+					AltTitle:     tt.meta.AlternateTitle,
+					Year:         tt.meta.Release.Year,
+					Resolution:   tt.meta.Release.Resolution,
+					Audio:        tt.meta.Audio,
+					Season:       tt.meta.SeasonStr,
+					Episode:      tt.meta.EpisodeStr,
+					EpisodeTitle: tt.meta.EpisodeTitle,
+					Repack:       tt.meta.Repack,
+					Tag:          tt.meta.Tag,
+					Source:       tt.meta.Source,
+					VideoCodec:   tt.meta.VideoCodec,
+					VideoEncode:  tt.meta.VideoEncode,
+					Edition:      tt.meta.Edition,
+				}, nil).Name
+			}
 			if got := profile.BuildName(tt.meta, config.TrackerConfig{}); got != tt.want {
 				t.Fatalf("name = %q, want %q", got, tt.want)
 			}
