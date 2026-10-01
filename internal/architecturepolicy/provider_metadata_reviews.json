@@ -1327,6 +1327,18 @@
     "sha256": "ab4554d412271ca56cd2f46766224e46392f1cda0d78eba0900ab3348e50eabd",
     "reason": "Structured-name migration review: current prepared-source/generation provider evidence and manual fact/component precedence are preserved; callers and provider-value helpers were reviewed together."
   },
+  "internal/trackers/impl/unit3d/sites/dvl/name.go:addDVLLanguageMarker": {
+    "sha256": "ec88d9986e4692d91ba80ce347be8e4e9c082eec950c34230c4573d2206b77b8",
+    "reason": "DVL naming-guide review: reads the resolved original language and prepared audio languages (manual overrides already applied) and only edits name components through the Defaults policy, which leaves manual components unchanged."
+  },
+  "internal/trackers/impl/unit3d/sites/dvl/name.go:applyDVLAudio": {
+    "sha256": "cf6335da648318cbe8bd89e585fb5c4090d3ba1116fadec58dd7257ab25f5dd0",
+    "reason": "DVL naming-guide review: reads the resolved original language and prepared audio languages (manual overrides already applied) and only edits name components through the Defaults policy, which leaves manual components unchanged."
+  },
+  "internal/trackers/impl/unit3d/sites/dvl/name.go:dvlAudioLanguages": {
+    "sha256": "9cdc8978a4aeadc33aaa6d3de952aa12fb6acd3476b7d3e813e44c06ba6e1b41",
+    "reason": "DVL naming-guide review: reads the resolved original language and prepared audio languages (manual overrides already applied) and only edits name components through the Defaults policy, which leaves manual components unchanged."
+  },
   "internal/trackers/impl/unit3d/sites/dvl/rules.go:ValidationPolicy": {
     "sha256": "d7cf0948e54043b2c9d19fd27567284d8e50abc384190b3da733f57f74a23e54",
     "reason": "Binds checkContent, which preserves manual genres through ValidationRuleSubject and RuleGenres; TMDB keywords remain current-source policy evidence."
